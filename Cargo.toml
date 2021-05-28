@@ -1,6 +1,6 @@
 [package]
 name = "blake3"
-version = "0.3.7"
+version = "1.0.0"
 authors = ["Jack O'Connor <oconnor663@gmail.com>"]
 description = "the BLAKE3 hash function"
 repository = "https://github.com/BLAKE3-team/BLAKE3"
@@ -80,12 +80,12 @@ features = ["rayon"]
 
 [dependencies]
 arrayref = "0.3.5"
-arrayvec = { version = "0.5.1", default-features = false, features = ["array-sizes-33-128"] }
+arrayvec = { version = "0.7.0", default-features = false }
 constant_time_eq = "0.1.5"
 rayon = { version = "1.2.1", optional = true }
 cfg-if = "1.0.0"
 digest = { version = "0.9.0", optional = true }
-crypto-mac = { version = "0.10.0", optional = true }
+crypto-mac = { version = "0.11.0", optional = true }
 
 [dev-dependencies]
 hex = "0.4.2"
