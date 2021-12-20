@@ -3,9 +3,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#else
+#include <io.h>
 
-int main() {
+typedef int ssize_t;
+
+#if !defined(STDIN_FILENO)
+#define STDIN_FILENO 0
+#endif
+
+#endif // _MSC_VER
+
+#include "monolithic_examples.h"
+
+
+#if defined(BUILD_MONOLITHIC)
+#define main(cnt, arr)      BLAKE3_example_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
+{
   // Initialize the hasher.
   blake3_hasher hasher;
   blake3_hasher_init(&hasher);
@@ -20,7 +39,7 @@ int main() {
       break; // end of file
     } else {
       fprintf(stderr, "read failed: %s\n", strerror(errno));
-      exit(1);
+      return EXIT_FAILURE;
     }
   }
 
@@ -33,5 +52,5 @@ int main() {
     printf("%02x", output[i]);
   }
   printf("\n");
-  return 0;
+  return EXIT_SUCCESS;
 }

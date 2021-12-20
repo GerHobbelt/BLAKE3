@@ -13,6 +13,9 @@
 
 #include "blake3.h"
 #include "blake3_impl.h"
+#include "blake3_get_cpu_features.h"
+
+#include "monolithic_examples.h"
 
 #define HASH_MODE 0
 #define KEYED_HASH_MODE 1
@@ -30,7 +33,7 @@ static void hex_char_value(uint8_t c, uint8_t *value, bool *valid) {
   }
 }
 
-static int parse_key(char *hex_key, uint8_t out[BLAKE3_KEY_LEN]) {
+static int parse_key(const char *hex_key, uint8_t out[BLAKE3_KEY_LEN]) {
   size_t hex_len = strlen(hex_key);
   if (hex_len != 64) {
     fprintf(stderr, "Expected a 64-char hexadecimal key, got %zu chars.\n",
@@ -54,26 +57,17 @@ static int parse_key(char *hex_key, uint8_t out[BLAKE3_KEY_LEN]) {
   return 0;
 }
 
-/* A little repetition here */
-enum cpu_feature {
-  SSE2 = 1 << 0,
-  SSSE3 = 1 << 1,
-  SSE41 = 1 << 2,
-  AVX = 1 << 3,
-  AVX2 = 1 << 4,
-  AVX512F = 1 << 5,
-  AVX512VL = 1 << 6,
-  /* ... */
-  UNDEFINED = 1 << 30
-};
 
-extern enum cpu_feature g_cpu_features;
-enum cpu_feature get_cpu_features();
 
-int main(int argc, char **argv) {
+#if defined(BUILD_MONOLITHIC)
+#define main(cnt, arr)      BLAKE3_demo_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
+{
   size_t out_len = BLAKE3_OUT_LEN;
   uint8_t key[BLAKE3_KEY_LEN];
-  char *context = "";
+  const char *context = "";
   uint8_t mode = HASH_MODE;
   while (argc > 1) {
     if (argc <= 2) {
@@ -129,7 +123,7 @@ int main(int argc, char **argv) {
   int feature = 0;
   do {
     fprintf(stderr, "Testing 0x%08X\n", feature);
-    g_cpu_features = feature;
+    g_blake3_cpu_features = feature;
     blake3_hasher hasher;
     switch (mode) {
     case HASH_MODE:
@@ -142,7 +136,8 @@ int main(int argc, char **argv) {
       blake3_hasher_init_derive_key(&hasher, context);
       break;
     default:
-      abort();
+      assert(!"Should neever get here.");
+	  exit(999);
     }
 
     blake3_hasher_update(&hasher, buf, buf_len);

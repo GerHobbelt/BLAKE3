@@ -1,5 +1,7 @@
 #include "blake3_impl.h"
 
+#if !defined(_MSC_VER) || defined(_M_ARM)
+
 #include <arm_neon.h>
 
 #ifdef __ARM_BIG_ENDIAN
@@ -349,3 +351,5 @@ void blake3_hash_many_neon(const uint8_t *const *inputs, size_t num_inputs,
     out = &out[BLAKE3_OUT_LEN];
   }
 }
+
+#endif // _M_ARM

@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "blake3_impl.h"
+#include "blake3_get_cpu_features.h"
 
 #if defined(IS_X86)
 #if defined(_MSC_VER)
@@ -61,31 +62,14 @@ static void cpuidex(uint32_t out[4], uint32_t id, uint32_t sid) {
 
 #endif
 
-enum cpu_feature {
-  SSE2 = 1 << 0,
-  SSSE3 = 1 << 1,
-  SSE41 = 1 << 2,
-  AVX = 1 << 3,
-  AVX2 = 1 << 4,
-  AVX512F = 1 << 5,
-  AVX512VL = 1 << 6,
-  /* ... */
-  UNDEFINED = 1 << 30
-};
 
-#if !defined(BLAKE3_TESTING)
-static /* Allow the variable to be controlled manually for testing */
-#endif
-    enum cpu_feature g_cpu_features = UNDEFINED;
+enum blake3_cpu_feature g_blake3_cpu_features = UNDEFINED;
 
-#if !defined(BLAKE3_TESTING)
-static
-#endif
-    enum cpu_feature
-    get_cpu_features() {
+enum blake3_cpu_feature
+	blake3_get_cpu_features() {
 
-  if (g_cpu_features != UNDEFINED) {
-    return g_cpu_features;
+  if (g_blake3_cpu_features != UNDEFINED) {
+    return g_blake3_cpu_features;
   } else {
 #if defined(IS_X86)
     uint32_t regs[4] = {0};
@@ -124,7 +108,7 @@ static
         }
       }
     }
-    g_cpu_features = features;
+    g_blake3_cpu_features = features;
     return features;
 #else
     /* How to detect NEON? */
@@ -138,7 +122,7 @@ void blake3_compress_in_place(uint32_t cv[8],
                               uint8_t block_len, uint64_t counter,
                               uint8_t flags) {
 #if defined(IS_X86)
-  const enum cpu_feature features = get_cpu_features();
+  const enum cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if (features & AVX512VL) {
@@ -167,7 +151,7 @@ void blake3_compress_xof(const uint32_t cv[8],
                          uint8_t block_len, uint64_t counter, uint8_t flags,
                          uint8_t out[64]) {
 #if defined(IS_X86)
-  const enum cpu_feature features = get_cpu_features();
+  const enum cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if (features & AVX512VL) {
@@ -196,7 +180,7 @@ void blake3_hash_many(const uint8_t *const *inputs, size_t num_inputs,
                       bool increment_counter, uint8_t flags,
                       uint8_t flags_start, uint8_t flags_end, uint8_t *out) {
 #if defined(IS_X86)
-  const enum cpu_feature features = get_cpu_features();
+  const enum cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if ((features & (AVX512F|AVX512VL)) == (AVX512F|AVX512VL)) {
@@ -246,7 +230,7 @@ void blake3_hash_many(const uint8_t *const *inputs, size_t num_inputs,
 // The dynamically detected SIMD degree of the current platform.
 size_t blake3_simd_degree(void) {
 #if defined(IS_X86)
-  const enum cpu_feature features = get_cpu_features();
+  const enum cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if ((features & (AVX512F|AVX512VL)) == (AVX512F|AVX512VL)) {
