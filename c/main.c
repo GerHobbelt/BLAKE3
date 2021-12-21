@@ -119,7 +119,7 @@ int main(int argc, const char** argv)
     assert(buf_len < buf_capacity);
   }
 
-  const int mask = get_cpu_features();
+  const int mask = blake3_get_cpu_features();
   int feature = 0;
   do {
     fprintf(stderr, "Testing 0x%08X\n", feature);
@@ -136,7 +136,7 @@ int main(int argc, const char** argv)
       blake3_hasher_init_derive_key(&hasher, context);
       break;
     default:
-      assert(!"Should neever get here.");
+      assert(!"Should never get here.");
 	  exit(999);
     }
 
