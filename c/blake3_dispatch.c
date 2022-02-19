@@ -62,14 +62,31 @@ static void cpuidex(uint32_t out[4], uint32_t id, uint32_t sid) {
 
 #endif
 
+#if defined(IS_X86) // only define cpu_feature on x86
 
-enum blake3_cpu_feature g_blake3_cpu_features = UNDEFINED;
+// stdatomic.h is not yet available under MSVC
+#if !defined(_MSC_VER)
+#include <stdatomic.h>
+#endif
+
+#if defined(_MSC_VER)
+long g_blake3_cpu_features = UNDEFINED;
+#else
+atomic_int g_blake3_cpu_features = UNDEFINED;
+#endif
 
 enum blake3_cpu_feature
 	blake3_get_cpu_features() {
 
-  if (g_blake3_cpu_features != UNDEFINED) {
-    return g_blake3_cpu_features;
+#if defined(_MSC_VER)
+  // This ordinary load is effectively a relaxed atomic under MSVC.
+  // https://docs.microsoft.com/en-us/windows/win32/sync/interlocked-variable-access
+  long load = g_blake3_cpu_features;
+#else
+  int load = atomic_load_explicit(&g_blake3_cpu_features, memory_order_relaxed);
+#endif
+  if (load != UNDEFINED) {
+    return (enum blake3_cpu_feature)load;
   } else {
 #if defined(IS_X86)
     uint32_t regs[4] = {0};
@@ -108,7 +125,13 @@ enum blake3_cpu_feature
         }
       }
     }
-    g_blake3_cpu_features = features;
+#if defined(_MSC_VER)
+    // This ordinary store is effectively a relaxed atomic under MSVC.
+    // https://docs.microsoft.com/en-us/windows/win32/sync/interlocked-variable-access
+    g_blake3_cpu_features = (long)features;
+#else
+    atomic_store_explicit(&g_blake3_cpu_features, (int)features, memory_order_relaxed);
+#endif
     return features;
 #else
     /* How to detect NEON? */
@@ -116,6 +139,7 @@ enum blake3_cpu_feature
 #endif
   }
 }
+#endif // only define cpu_feature on x86
 
 void blake3_compress_in_place(uint32_t cv[8],
                               const uint8_t block[BLAKE3_BLOCK_LEN],
@@ -183,7 +207,7 @@ void blake3_hash_many(const uint8_t *const *inputs, size_t num_inputs,
   const enum cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
-  if ((features & (AVX512F|AVX512VL)) == (AVX512F|AVX512VL)) {
+  if ((features & (AVX512F | AVX512VL)) == (AVX512F | AVX512VL)) {
     blake3_hash_many_avx512(inputs, num_inputs, blocks, key, counter,
                             increment_counter, flags, flags_start, flags_end,
                             out);
@@ -233,7 +257,7 @@ size_t blake3_simd_degree(void) {
   const enum cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
-  if ((features & (AVX512F|AVX512VL)) == (AVX512F|AVX512VL)) {
+  if ((features & (AVX512F | AVX512VL)) == (AVX512F | AVX512VL)) {
     return 16;
   }
 #endif
