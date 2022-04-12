@@ -18,7 +18,7 @@
 #define MAYBE_UNUSED(x) (void)((x))
 
 #if defined(IS_X86)
-static uint64_t xgetbv() {
+static uint64_t xgetbv(void) {
 #if defined(_MSC_VER)
   return _xgetbv(0);
 #else
@@ -76,7 +76,7 @@ atomic_int g_blake3_cpu_features = UNDEFINED;
 #endif
 
 enum blake3_cpu_feature
-	blake3_get_cpu_features() {
+	blake3_get_cpu_features(void) {
 
 #if defined(_MSC_VER)
   // This ordinary load is effectively a relaxed atomic under MSVC.

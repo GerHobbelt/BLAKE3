@@ -20,10 +20,10 @@ typedef int ssize_t;
 
 
 #if defined(BUILD_MONOLITHIC)
-#define main(cnt, arr)      BLAKE3_example_main(cnt, arr)
+#define main      BLAKE3_example_main
 #endif
 
-int main(int argc, const char** argv)
+int main(void)
 {
   // Initialize the hasher.
   blake3_hasher hasher;

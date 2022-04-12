@@ -1,5 +1,5 @@
 use anyhow::{bail, ensure, Context, Result};
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use std::cmp;
 use std::convert::TryInto;
 use std::fs::File;
@@ -33,7 +33,7 @@ struct Args {
 
 impl Args {
     fn parse() -> Result<Self> {
-        let inner = App::new(NAME)
+        let inner = Command::new(NAME)
             .version(env!("CARGO_PKG_VERSION"))
             .arg(
                 Arg::new(FILE_ARG)
@@ -207,7 +207,7 @@ impl Args {
 }
 
 enum Input {
-    Mmap(io::Cursor<memmap::Mmap>),
+    Mmap(io::Cursor<memmap2::Mmap>),
     File(File),
     Stdin,
 }
@@ -316,7 +316,7 @@ fn copy_wide(mut reader: impl Read, hasher: &mut blake3::Hasher) -> io::Result<u
 // Mmap a file, if it looks like a good idea. Return None in cases where we
 // know mmap will fail, or if the file is short enough that mmapping isn't
 // worth it. However, if we do try to mmap and it fails, return the error.
-fn maybe_memmap_file(file: &File) -> Result<Option<memmap::Mmap>> {
+fn maybe_memmap_file(file: &File) -> Result<Option<memmap2::Mmap>> {
     let metadata = file.metadata()?;
     let file_size = metadata.len();
     Ok(if !metadata.is_file() {
@@ -337,9 +337,9 @@ fn maybe_memmap_file(file: &File) -> Result<Option<memmap::Mmap>> {
         // Explicitly set the length of the memory map, so that filesystem
         // changes can't race to violate the invariants we just checked.
         let map = unsafe {
-            memmap::MmapOptions::new()
+            memmap2::MmapOptions::new()
                 .len(file_size as usize)
-                .map(&file)?
+                .map(file)?
         };
         Some(map)
     })
