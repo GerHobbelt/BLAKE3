@@ -23,7 +23,7 @@ typedef int ssize_t;
 #define main      BLAKE3_example_main
 #endif
 
-int main(void)
+int main()
 {
   // Initialize the hasher.
   blake3_hasher hasher;
