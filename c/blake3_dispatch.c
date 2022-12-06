@@ -11,7 +11,7 @@
 #elif defined(__GNUC__)
 #include <immintrin.h>
 #else
-#error "Unimplemented!"
+#undef IS_X86 /* Unimplemented! */
 #endif
 #endif
 
