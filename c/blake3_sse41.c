@@ -2,7 +2,7 @@
 
 #include <immintrin.h>
 
-#if !defined(BUILD_MONOLITHIC)  // monolithic build mode also includes the Assembly source files implementing these same functions.
+#if !(defined(BUILD_MONOLITHIC) && defined(_MSC_VER))  // monolithic build mode also includes the Assembly source files implementing these same functions.
 
 #define DEGREE 4
 
