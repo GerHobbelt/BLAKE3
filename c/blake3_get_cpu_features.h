@@ -20,7 +20,7 @@ extern "C" {
 	};
 
 	extern enum blake3_cpu_feature g_blake3_cpu_features;
-	enum blake3_cpu_feature blake3_get_cpu_features();
+	enum blake3_cpu_feature blake3_get_cpu_features(void);
 
 #ifdef __cplusplus
 }
