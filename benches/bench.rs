@@ -703,50 +703,45 @@ fn bench_two_updates(b: &mut Bencher) {
     });
 }
 
-#[bench]
-fn bench_xof_stream_kernel(b: &mut Bencher) {
-    let mut output = [0; 16 * 64];
-    b.bytes = output.len() as u64;
-    let message_words = [0; 16];
-    let key_words = [0; 8];
-    let counter = 0;
-    let block_length = 0;
-    let flags = 1 | 2 | 16; // CHUNK_START | CHUNK_END | KEYED_HASH
-    b.iter(|| unsafe {
-        blake3::kernel::xof_stream16(
-            &message_words,
-            &key_words,
-            counter,
-            block_length,
-            flags,
-            &mut output,
-        );
-    });
-    // Double check that this output is reasonable.
-    let mut expected = [0; 16 * 64];
-    blake3::Hasher::new_keyed(&[0; 32])
-        .finalize_xof()
-        .fill(&mut expected);
-    assert_eq!(expected, output);
+fn bench_xof(b: &mut Bencher, len: usize) {
+    b.bytes = len as u64;
+    let mut output = [0u8; 64 * BLOCK_LEN];
+    let output_slice = &mut output[..len];
+    let mut xof = blake3::Hasher::new().finalize_xof();
+    b.iter(|| xof.fill(output_slice));
 }
 
 #[bench]
-fn bench_xof_xor_kernel(b: &mut Bencher) {
-    let mut output = [0; 16 * 64];
-    b.bytes = output.len() as u64;
-    let message_words = [0; 16];
-    let key_words = [0; 8];
-    let counter = 0;
-    let block_length = 0;
-    let flags = 1 | 2 | 16; // CHUNK_START | CHUNK_END | KEYED_HASH
-    b.iter(|| unsafe {
-        blake3::kernel::xof_xor16(
-            &message_words,
-            &key_words,
-            counter,
-            block_length,
-            flags,
-            &mut output,
-        );
-    });
+fn bench_xof_01_block(b: &mut Bencher) {
+    bench_xof(b, BLOCK_LEN);
+}
+
+#[bench]
+fn bench_xof_02_blocks(b: &mut Bencher) {
+    bench_xof(b, 2 * BLOCK_LEN);
+}
+
+#[bench]
+fn bench_xof_04_blocks(b: &mut Bencher) {
+    bench_xof(b, 4 * BLOCK_LEN);
+}
+
+#[bench]
+fn bench_xof_08_blocks(b: &mut Bencher) {
+    bench_xof(b, 8 * BLOCK_LEN);
+}
+
+#[bench]
+fn bench_xof_16_blocks(b: &mut Bencher) {
+    bench_xof(b, 16 * BLOCK_LEN);
+}
+
+#[bench]
+fn bench_xof_32_blocks(b: &mut Bencher) {
+    bench_xof(b, 32 * BLOCK_LEN);
+}
+
+#[bench]
+fn bench_xof_64_blocks(b: &mut Bencher) {
+    bench_xof(b, 64 * BLOCK_LEN);
 }
