@@ -7,12 +7,39 @@
 
 #if defined(IS_X86)
 #if defined(_MSC_VER)
+#include <Windows.h>
 #include <intrin.h>
 #elif defined(__GNUC__)
 #include <immintrin.h>
 #else
 #undef IS_X86 /* Unimplemented! */
 #endif
+#endif
+
+#if !defined(BLAKE3_ATOMICS)
+#if defined(__has_include)
+#if __has_include(<stdatomic.h>) && !defined(_MSC_VER)
+#define BLAKE3_ATOMICS 1
+#else
+#define BLAKE3_ATOMICS 0
+#endif /* __has_include(<stdatomic.h>) && !defined(_MSC_VER) */
+#else
+#define BLAKE3_ATOMICS 0
+#endif /* defined(__has_include) */
+#endif /* BLAKE3_ATOMICS */
+
+#if BLAKE3_ATOMICS
+#define ATOMIC_INT _Atomic int
+#define ATOMIC_LOAD(x) x
+#define ATOMIC_STORE(x, y) x = y
+#elif defined(_MSC_VER)
+#define ATOMIC_INT LONG
+#define ATOMIC_LOAD(x) InterlockedOr(&x, 0)
+#define ATOMIC_STORE(x, y) InterlockedExchange(&x, y)
+#else
+#define ATOMIC_INT int
+#define ATOMIC_LOAD(x) x
+#define ATOMIC_STORE(x, y) x = y
 #endif
 
 #define MAYBE_UNUSED(x) (void)((x))
@@ -72,7 +99,7 @@ static void cpuidex(uint32_t out[4], uint32_t id, uint32_t sid) {
 #if defined(_MSC_VER)
 long g_blake3_cpu_features = UNDEFINED;
 #else
-atomic_int g_blake3_cpu_features = UNDEFINED;
+ATOMIC_INT g_blake3_cpu_features = UNDEFINED;
 #endif
 
 enum blake3_cpu_feature
@@ -83,7 +110,8 @@ enum blake3_cpu_feature
   // https://docs.microsoft.com/en-us/windows/win32/sync/interlocked-variable-access
   long load = g_blake3_cpu_features;
 #else
-  int load = atomic_load_explicit(&g_blake3_cpu_features, memory_order_relaxed);
+  /* If TSAN detects a data race here, try compiling with -DBLAKE3_ATOMICS=1 */
+  enum cpu_feature features = ATOMIC_LOAD(g_cpu_features);
 #endif
   if (load != UNDEFINED) {
     return (enum blake3_cpu_feature)load;
@@ -92,7 +120,7 @@ enum blake3_cpu_feature
     uint32_t regs[4] = {0};
     uint32_t *eax = &regs[0], *ebx = &regs[1], *ecx = &regs[2], *edx = &regs[3];
     (void)edx;
-    enum cpu_feature features = 0;
+    features = 0;
     cpuid(regs, 0);
     const int max_id = *eax;
     cpuid(regs, 1);
@@ -130,7 +158,7 @@ enum blake3_cpu_feature
     // https://docs.microsoft.com/en-us/windows/win32/sync/interlocked-variable-access
     g_blake3_cpu_features = (long)features;
 #else
-    atomic_store_explicit(&g_blake3_cpu_features, (int)features, memory_order_relaxed);
+    ATOMIC_STORE(&g_blake3_cpu_features, (int)features);
 #endif
     return features;
 #else
