@@ -161,7 +161,7 @@ jobs:
           # The b3sum MSRV is sometimes higher than the blake3 crate's, because
           # b3sum depends on Clap. We check in the b3sum Cargo.lock, so Clap
           # update shouldn't randomly break us here.
-          "1.70.0",
+          "1.74.1",
         ]
 
     steps:
@@ -336,3 +336,16 @@ jobs:
         run: cmake -S c -B c/build -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/target
       - name: CMake build / install
         run: cmake --build c/build --target install
+
+  miri_smoketest:
+    name: Miri smoketest
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: miri
+    # Currently the test search "miri" only matches "test_miri_smoketest", but
+    # we might add more. If this accidentally picks up anything incompatible or
+    # slow, we can narrow it.
+    - run: cargo miri test miri

@@ -307,10 +307,28 @@ impl core::str::FromStr for Hash {
     }
 }
 
+// A proper implementation of constant time equality is tricky, and we get it from the
+// constant_time_eq crate instead of rolling our own. However, that crate isn't compatible with
+// Miri, so we roll our own just for that.
+#[cfg(miri)]
+fn constant_time_eq_miri(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut x = 0;
+    for i in 0..a.len() {
+        x |= a[i] ^ b[i];
+    }
+    x == 0
+}
+
 /// This implementation is constant-time.
 impl PartialEq for Hash {
     #[inline]
     fn eq(&self, other: &Hash) -> bool {
+        #[cfg(miri)]
+        return constant_time_eq_miri(&self.0, &other.0);
+        #[cfg(not(miri))]
         constant_time_eq::constant_time_eq_32(&self.0, &other.0)
     }
 }
@@ -319,6 +337,9 @@ impl PartialEq for Hash {
 impl PartialEq<[u8; OUT_LEN]> for Hash {
     #[inline]
     fn eq(&self, other: &[u8; OUT_LEN]) -> bool {
+        #[cfg(miri)]
+        return constant_time_eq_miri(&self.0, other);
+        #[cfg(not(miri))]
         constant_time_eq::constant_time_eq_32(&self.0, other)
     }
 }
@@ -327,6 +348,9 @@ impl PartialEq<[u8; OUT_LEN]> for Hash {
 impl PartialEq<[u8]> for Hash {
     #[inline]
     fn eq(&self, other: &[u8]) -> bool {
+        #[cfg(miri)]
+        return constant_time_eq_miri(&self.0, other);
+        #[cfg(not(miri))]
         constant_time_eq::constant_time_eq(&self.0, other)
     }
 }
