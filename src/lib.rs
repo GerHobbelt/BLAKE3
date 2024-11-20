@@ -56,6 +56,11 @@
 //! [`Zeroize`](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html) for
 //! this crate's types.
 //!
+//! The `serde` feature (disabled by default, but enabled for [docs.rs]) implements
+//! [`serde::Serialize`](https://docs.rs/serde/latest/serde/trait.Serialize.html) and
+//! [`serde::Deserialize`](https://docs.rs/serde/latest/serde/trait.Deserialize.html)
+//! for [`Hash`](struct@Hash).
+//!
 //! The NEON implementation is enabled by default for AArch64 but requires the
 //! `neon` feature for other ARM targets. Not all ARMv7 CPUs support NEON, and
 //! enabling this feature will produce a binary that's not portable to CPUs
@@ -214,6 +219,7 @@ fn counter_high(counter: u64) -> u32 {
 /// [`Display`]: https://doc.rust-lang.org/std/fmt/trait.Display.html
 /// [`FromStr`]: https://doc.rust-lang.org/std/str/trait.FromStr.html
 #[cfg_attr(feature = "zeroize", derive(zeroize::Zeroize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, Hash)]
 pub struct Hash([u8; OUT_LEN]);
 
