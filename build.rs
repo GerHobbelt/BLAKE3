@@ -109,7 +109,7 @@ fn new_build() -> cc::Build {
     build
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 enum CCompilerSupport {
     NoCompiler,
     NoAVX512,
@@ -120,27 +120,27 @@ use CCompilerSupport::*;
 fn c_compiler_support() -> CCompilerSupport {
     let build = new_build();
     let flags_checked;
-    let support_result: Result<bool, _> = if dbg!(is_windows_msvc()) {
+    let support_result: Result<bool, _> = if is_windows_msvc() {
         flags_checked = "/arch:AVX512";
-        dbg!(build.is_flag_supported("/arch:AVX512"))
+        build.is_flag_supported("/arch:AVX512")
     } else {
         // Check for both of the flags we use. If -mavx512f works, then -mavx512vl
         // will probably always work too, but we might as well be thorough.
         flags_checked = "-mavx512f and -mavx512vl";
-        match dbg!(build.is_flag_supported("-mavx512f")) {
-            Ok(true) => dbg!(build.is_flag_supported("-mavx512vl")),
+        match build.is_flag_supported("-mavx512f") {
+            Ok(true) => build.is_flag_supported("-mavx512vl"),
             false_or_error => false_or_error,
         }
     };
-    match dbg!(support_result) {
-        Ok(true) => dbg!(YesAVX512),
+    match support_result {
+        Ok(true) => YesAVX512,
         Ok(false) => {
             warn(&format!(
                 "The C compiler {:?} does not support {}.",
                 build.get_compiler().path(),
                 flags_checked,
             ));
-            dbg!(NoAVX512)
+            NoAVX512
         }
         Err(e) => {
             println!("{:?}", e);
@@ -148,7 +148,7 @@ fn c_compiler_support() -> CCompilerSupport {
                 "No C compiler {:?} detected.",
                 build.get_compiler().path()
             ));
-            dbg!(NoCompiler)
+            NoCompiler
         }
     }
 }

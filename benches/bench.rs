@@ -11,8 +11,6 @@ use rand::prelude::*;
 use test::Bencher;
 
 const KIB: usize = 1024;
-const MIB: usize = 1024 * KIB;
-const BIG: usize = 64 * MIB;
 
 // This struct randomizes two things:
 // 1. The actual bytes of input.
@@ -22,46 +20,23 @@ pub struct RandomInput {
     len: usize,
     offsets: Vec<usize>,
     offset_index: usize,
-    alignment_skip: usize,
 }
 
 impl RandomInput {
     pub fn new(b: &mut Bencher, len: usize) -> Self {
-        Self::new_aligned(b, len, 1)
-    }
-
-    pub fn new_aligned(b: &mut Bencher, len: usize, alignment: usize) -> Self {
         b.bytes += len as u64;
         let page_size: usize = page_size::get();
-        let mut buf = vec![0u8; len + page_size + alignment];
-        let buf_misalign = (buf.as_ptr() as usize) % alignment;
-        let alignment_skip = if buf_misalign == 0 {
-            0
-        } else {
-            alignment - buf_misalign
-        };
-        assert_eq!(0, (buf.as_ptr() as usize + alignment_skip) % alignment);
+        let mut buf = vec![0u8; len + page_size];
         let mut rng = rand::thread_rng();
         rng.fill_bytes(&mut buf);
-        let mut offsets = Vec::new();
-        for offset in 0..page_size {
-            if offset % alignment == 0 {
-                offsets.push(offset);
-            }
-        }
+        let mut offsets: Vec<usize> = (0..page_size).collect();
         offsets.shuffle(&mut rng);
-        let mut ret = Self {
+        Self {
             buf,
             len,
             offsets,
             offset_index: 0,
-            alignment_skip,
-        };
-        // Be extra careful sure that we're meeting our alignment guarantees.
-        for _ in 0..100 {
-            assert_eq!(0, ret.get().as_ptr() as usize % alignment);
         }
-        ret
     }
 
     pub fn get(&mut self) -> &[u8] {
@@ -70,7 +45,7 @@ impl RandomInput {
         if self.offset_index >= self.offsets.len() {
             self.offset_index = 0;
         }
-        &self.buf[self.alignment_skip + offset..][..self.len]
+        &self.buf[offset..][..self.len]
     }
 }
 
@@ -108,40 +83,6 @@ fn bench_single_compression_avx512(b: &mut Bencher) {
     if let Some(platform) = Platform::avx512() {
         bench_single_compression_fn(b, platform);
     }
-}
-
-fn bench_kernel_compression_fn(b: &mut Bencher, f: blake3::kernel::CompressionFn) {
-    let mut state = [1u32; 8];
-    let mut r = RandomInput::new(b, 64);
-    let input = array_ref!(r.get(), 0, 64);
-    b.iter(|| unsafe { f(&mut state, input, 64, 0, 0) });
-}
-
-#[bench]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-fn bench_kernel_compression_sse2(b: &mut Bencher) {
-    if !is_x86_feature_detected!("sse2") {
-        return;
-    }
-    bench_kernel_compression_fn(b, blake3::kernel::blake3_sse2_compress);
-}
-
-#[bench]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-fn bench_kernel_compression_sse41(b: &mut Bencher) {
-    if !is_x86_feature_detected!("sse4.1") {
-        return;
-    }
-    bench_kernel_compression_fn(b, blake3::kernel::blake3_sse41_compress);
-}
-
-#[bench]
-#[cfg(blake3_avx512_ffi)]
-fn bench_kernel_compression_avx512(b: &mut Bencher) {
-    if !is_x86_feature_detected!("avx512f") || !is_x86_feature_detected!("avx512vl") {
-        return;
-    }
-    bench_kernel_compression_fn(b, blake3::kernel::blake3_avx512_compress);
 }
 
 fn bench_many_chunks_fn(b: &mut Bencher, platform: Platform) {
@@ -210,15 +151,6 @@ fn bench_many_chunks_neon(b: &mut Bencher) {
     }
 }
 
-#[bench]
-fn bench_many_chunks_kernel(b: &mut Bencher) {
-    let mut input = RandomInput::new(b, 16 * CHUNK_LEN);
-    let mut out = [blake3::kernel::Words16([0; 16]); 8];
-    b.iter(|| unsafe {
-        blake3::kernel::chunks16(input.get().try_into().unwrap(), &[0; 8], 0, 0, &mut out);
-    });
-}
-
 // TODO: When we get const generics we can unify this with the chunks code.
 fn bench_many_parents_fn(b: &mut Bencher, platform: Platform) {
     let degree = platform.simd_degree();
@@ -284,31 +216,6 @@ fn bench_many_parents_neon(b: &mut Bencher) {
     if let Some(platform) = Platform::neon() {
         bench_many_parents_fn(b, platform);
     }
-}
-
-#[bench]
-fn bench_many_parents_kernel(b: &mut Bencher) {
-    use blake3::kernel::Words16;
-    let size = 16 * std::mem::size_of::<Words16>();
-    let alignment = std::mem::align_of::<Words16>();
-    assert_eq!(alignment, 64);
-    let mut input = RandomInput::new_aligned(b, size, alignment);
-    for _ in 0..100 {
-        assert_eq!(0, (input.get().as_ptr() as usize) % alignment);
-    }
-    let mut output = [blake3::kernel::Words16([0; 16]); 8];
-    b.iter(|| unsafe {
-        let rand_ptr = input.get().as_ptr();
-        let rand_left_children = &*(rand_ptr as *const [Words16; 8]);
-        let rand_right_children = &*(rand_ptr.add(size / 2) as *const [Words16; 8]);
-        blake3::kernel::parents16(
-            &rand_left_children,
-            &rand_right_children,
-            &[0; 8],
-            0,
-            &mut output,
-        );
-    });
 }
 
 fn bench_atonce(b: &mut Bencher, len: usize) {
@@ -513,175 +420,81 @@ fn bench_reference_1024_kib(b: &mut Bencher) {
 }
 
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive(b: &mut Bencher, len: usize) {
+fn bench_rayon(b: &mut Bencher, len: usize) {
     let mut input = RandomInput::new(b, len);
     b.iter(|| blake3::Hasher::new().update_rayon(input.get()).finalize());
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0001_block(b: &mut Bencher) {
-    bench_rayon_recursive(b, BLOCK_LEN);
+fn bench_rayon_0001_block(b: &mut Bencher) {
+    bench_rayon(b, BLOCK_LEN);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0001_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 1 * KIB);
+fn bench_rayon_0001_kib(b: &mut Bencher) {
+    bench_rayon(b, 1 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0002_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 2 * KIB);
+fn bench_rayon_0002_kib(b: &mut Bencher) {
+    bench_rayon(b, 2 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0004_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 4 * KIB);
+fn bench_rayon_0004_kib(b: &mut Bencher) {
+    bench_rayon(b, 4 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0008_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 8 * KIB);
+fn bench_rayon_0008_kib(b: &mut Bencher) {
+    bench_rayon(b, 8 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0016_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 16 * KIB);
+fn bench_rayon_0016_kib(b: &mut Bencher) {
+    bench_rayon(b, 16 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0032_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 32 * KIB);
+fn bench_rayon_0032_kib(b: &mut Bencher) {
+    bench_rayon(b, 32 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0064_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 64 * KIB);
+fn bench_rayon_0064_kib(b: &mut Bencher) {
+    bench_rayon(b, 64 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0128_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 128 * KIB);
+fn bench_rayon_0128_kib(b: &mut Bencher) {
+    bench_rayon(b, 128 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0256_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 256 * KIB);
+fn bench_rayon_0256_kib(b: &mut Bencher) {
+    bench_rayon(b, 256 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_0512_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 512 * KIB);
+fn bench_rayon_0512_kib(b: &mut Bencher) {
+    bench_rayon(b, 512 * KIB);
 }
 
 #[bench]
 #[cfg(feature = "rayon")]
-fn bench_rayon_recursive_1024_kib(b: &mut Bencher) {
-    bench_rayon_recursive(b, 1024 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_recursive_big(b: &mut Bencher) {
-    bench_rayon_recursive(b, BIG);
-}
-
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front(b: &mut Bencher, len: usize) {
-    let mut input = RandomInput::new(b, len);
-    b.iter(|| {
-        blake3::Hasher::new()
-            .update_rayon_from_the_front(input.get())
-            .finalize()
-    });
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0001_block(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, BLOCK_LEN);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0001_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 1 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0002_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 2 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0004_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 4 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0008_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 8 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0016_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 16 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0032_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 32 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0064_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 64 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0128_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 128 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0256_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 256 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_0512_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 512 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_1024_kib(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, 1024 * KIB);
-}
-
-#[bench]
-#[cfg(feature = "rayon")]
-fn bench_rayon_from_the_front_big(b: &mut Bencher) {
-    bench_rayon_from_the_front(b, BIG);
+fn bench_rayon_1024_kib(b: &mut Bencher) {
+    bench_rayon(b, 1024 * KIB);
 }
 
 // This checks that update() splits up its input in increasing powers of 2, so
