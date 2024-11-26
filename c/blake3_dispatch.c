@@ -111,13 +111,13 @@ enum blake3_cpu_feature
 #if defined(_MSC_VER)
   // This ordinary load is effectively a relaxed atomic under MSVC.
   // https://docs.microsoft.com/en-us/windows/win32/sync/interlocked-variable-access
-  long load = g_blake3_cpu_features;
+  long features = g_blake3_cpu_features;
 #else
   /* If TSAN detects a data race here, try compiling with -DBLAKE3_ATOMICS=1 */
   enum cpu_feature features = ATOMIC_LOAD(g_cpu_features);
 #endif
-  if (load != UNDEFINED) {
-    return (enum blake3_cpu_feature)load;
+  if (features != UNDEFINED) {
+    return (enum blake3_cpu_feature)features;
   } else {
 #if defined(IS_X86)
     uint32_t regs[4] = {0};
@@ -240,7 +240,7 @@ void blake3_xof_many(const uint32_t cv[8],
     return;
   }
 #if defined(IS_X86)
-  const enum cpu_feature features = get_cpu_features();
+  const enum blake3_cpu_feature features = blake3_get_cpu_features();
 #if !defined(_WIN32) && !defined(BLAKE3_NO_AVX512)
   if (features & AVX512VL) {
     blake3_xof_many_avx512(cv, block, block_len, counter, flags, out, outblocks);
