@@ -177,7 +177,7 @@ void blake3_compress_in_place(uint32_t cv[8],
                               uint8_t block_len, uint64_t counter,
                               uint8_t flags) {
 #if defined(IS_X86)
-  const enum cpu_feature features = blake3_get_cpu_features();
+  const enum blake3_cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if (features & AVX512VL) {
@@ -206,7 +206,7 @@ void blake3_compress_xof(const uint32_t cv[8],
                          uint8_t block_len, uint64_t counter, uint8_t flags,
                          uint8_t out[64]) {
 #if defined(IS_X86)
-  const enum cpu_feature features = blake3_get_cpu_features();
+  const enum blake3_cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if (features & AVX512VL) {
@@ -258,7 +258,7 @@ void blake3_hash_many(const uint8_t *const *inputs, size_t num_inputs,
                       bool increment_counter, uint8_t flags,
                       uint8_t flags_start, uint8_t flags_end, uint8_t *out) {
 #if defined(IS_X86)
-  const enum cpu_feature features = blake3_get_cpu_features();
+  const enum blake3_cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if ((features & (AVX512F | AVX512VL)) == (AVX512F | AVX512VL)) {
@@ -308,7 +308,7 @@ void blake3_hash_many(const uint8_t *const *inputs, size_t num_inputs,
 // The dynamically detected SIMD degree of the current platform.
 size_t blake3_simd_degree(void) {
 #if defined(IS_X86)
-  const enum cpu_feature features = blake3_get_cpu_features();
+  const enum blake3_cpu_feature features = blake3_get_cpu_features();
   MAYBE_UNUSED(features);
 #if !defined(BLAKE3_NO_AVX512)
   if ((features & (AVX512F | AVX512VL)) == (AVX512F | AVX512VL)) {
