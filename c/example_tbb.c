@@ -5,9 +5,18 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#if !defined(_MSC_VER)
 #include <unistd.h>
+#endif
 
-int main(int argc, char **argv) {
+#include "monolithic_examples.h"
+
+
+#if defined(BUILD_MONOLITHIC)
+#define main      BLAKE3_tbb_example_main
+#endif
+
+int main(int argc, const char **argv) {
   // For each filepath argument, memory map it and hash it.
   for (int i = 1; i < argc; i++) {
     // Open and memory map the file.
