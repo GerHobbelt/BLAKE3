@@ -48,6 +48,7 @@
 #define MAYBE_UNUSED(x) (void)((x))
 
 #if defined(IS_X86)
+
 static uint64_t xgetbv(void) {
 #if defined(_MSC_VER)
   return _xgetbv(0);
@@ -170,6 +171,7 @@ enum blake3_cpu_feature
 #endif
   }
 }
+
 #endif // only define cpu_feature on x86
 
 void blake3_compress_in_place(uint32_t cv[8],
