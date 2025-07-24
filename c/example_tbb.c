@@ -3,14 +3,15 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/mman.h>
+#include <sys/mman.h>         // --> provided by Win32.mmap for MSWindows machines.
 #include <sys/stat.h>
 #if !defined(_MSC_VER)
 #include <unistd.h>
+#else
+#include <io.h>
 #endif
 
 #include "monolithic_examples.h"
-
 
 #if defined(BUILD_MONOLITHIC)
 #define main      BLAKE3_tbb_example_main
@@ -40,8 +41,13 @@ int main(int argc, const char **argv) {
     blake3_hasher hasher;
     blake3_hasher_init(&hasher);
 
-    // Hash the mapped file using multiple threads.
+#if defined(BLAKE3_USE_TBB)
+	// Hash the mapped file using multiple threads.
     blake3_hasher_update_tbb(&hasher, mapped, statbuf.st_size);
+#else
+	// Hash the mapped file using multiple threads.
+	blake3_hasher_update(&hasher, mapped, statbuf.st_size);
+#endif
 
     // Unmap and close the file.
     if (munmap(mapped, statbuf.st_size) == -1) {
@@ -63,4 +69,5 @@ int main(int argc, const char **argv) {
     }
     printf("\n");
   }
+  return 0;
 }

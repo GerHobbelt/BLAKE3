@@ -5,6 +5,8 @@
 
 #include "blake3_impl.h"
 
+#if defined(BLAKE3_USE_TBB)
+
 static_assert(TBB_USE_EXCEPTIONS == 0,
               "This file should be compiled with C++ exceptions disabled.");
 
@@ -35,3 +37,5 @@ extern "C" void blake3_compress_subtree_wide_join_tbb(
             r_input, r_input_len, key, r_chunk_counter, flags, r_cvs, use_tbb);
       });
 }
+
+#endif
