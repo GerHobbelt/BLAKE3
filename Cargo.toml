@@ -112,7 +112,6 @@ no_neon = []
 features = ["mmap", "rayon", "serde", "zeroize"]
 
 [dependencies]
-arrayref = "0.3.5"
 arrayvec = { version = "0.7.4", default-features = false }
 constant_time_eq = { version = "0.4.2", default-features = false }
 cfg-if = "1.0.0"
